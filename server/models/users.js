@@ -115,19 +115,25 @@ module.exports = class User extends Model {
     if (await bcrypt.compare(pwd, this.password) === true) {
       return true
     } else {
+      WIKI.logger.error(`users.verifyPassword: Password verification failed for User ID: ${this.id}.`)
       throw new WIKI.Error.AuthLoginFailed()
     }
   }
 
   async generateTFA() {
+    WIKI.logger.info(`users.generateTFA: Begin Two Factor Auth Generation for User ID: ${this.id}.`)
     let tfaInfo = tfa.generateSecret({
       name: WIKI.config.title,
       account: this.email
     })
+
+    WIKI.logger.info(`users.generateTFA: Secret generated for Two Factor Auth for User ID: ${this.id}.`)
     await WIKI.models.users.query().findById(this.id).patch({
       tfaIsActive: false,
       tfaSecret: tfaInfo.secret
     })
+
+    WIKI.logger.info(`users.generateTFA: Secret set for User ID: ${this.id}.`)
     const safeTitle = WIKI.config.title.replace(/[\s-.,=!@#$%?&*()+[\]{}/\\;<>]/g, '')
     return qr.imageSync(`otpauth://totp/${safeTitle}:${this.email}?secret=${tfaInfo.secret}`, { type: 'svg' })
   }
@@ -146,7 +152,10 @@ module.exports = class User extends Model {
   }
 
   verifyTFA(code) {
+    WIKI.logger.info(`users.verifyTFA: Begin verification of Two Factor Auth for User ID: ${this.id}.`)
     let result = tfa.verifyToken(this.tfaSecret, code)
+    v_result = result && _.has(result, 'delta') && result.delta === 0
+    WIKI.logger.info(`users.verifyTFA: Result: ${v_result}.`)
     return (result && _.has(result, 'delta') && result.delta === 0)
   }
 
@@ -335,6 +344,7 @@ module.exports = class User extends Model {
    * Perform post-login checks
    */
   static async afterLoginChecks (user, context, { skipTFA, skipChangePwd } = { skipTFA: false, skipChangePwd: false }) {
+    WIKI.logger.info(`users.afterLoginChecks: Begin afterLoginChecks for User ID ${user.id}.`)
     // Get redirect target
     user.groups = await user.$relatedQuery('groups').select('groups.id', 'permissions', 'redirectOnLogin')
     let redirect = '/'
@@ -347,15 +357,20 @@ module.exports = class User extends Model {
       }
     }
     console.info(redirect)
+    WIKI.logger.info(`users.afterLoginChecks: Group lookup and redirect completed`)
+    WIKI.logger.info(redirect)
 
     // Is 2FA required?
     if (!skipTFA) {
+      WIKI.logger.info(`users.afterLoginChecks: Two Factor Authentication Required for User ID: ${user.id}.`)
       if (user.tfaIsActive && user.tfaSecret) {
+        WIKI.logger.info(`users.afterLoginChecks: Two Factor Authentication set up for User ID: ${user.id}.`)
         try {
           const tfaToken = await WIKI.models.userKeys.generateToken({
             kind: 'tfa',
             userId: user.id
           })
+          WIKI.logger.info(`users.afterLoginChecks: TFA token successfully generated for User ID: ${user.id}.`)
           return {
             mustProvideTFA: true,
             continuationToken: tfaToken,
@@ -366,12 +381,15 @@ module.exports = class User extends Model {
           throw new WIKI.Error.AuthGenericError()
         }
       } else if (WIKI.config.auth.enforce2FA || (user.tfaIsActive && !user.tfaSecret)) {
+        WIKI.logger.info(`users.afterLoginChecks: Two Factor Authentication not set up for User ID: ${user.id}.`)
         try {
           const tfaQRImage = await user.generateTFA()
           const tfaToken = await WIKI.models.userKeys.generateToken({
             kind: 'tfaSetup',
             userId: user.id
           })
+
+          WIKI.logger.info(`users.afterLoginChecks: Two Factor Authentication not set up for User ID: ${user.id}.`)
           return {
             mustSetupTFA: true,
             continuationToken: tfaToken,
@@ -387,11 +405,14 @@ module.exports = class User extends Model {
 
     // Must Change Password?
     if (!skipChangePwd && user.mustChangePwd) {
+      WIKI.logger.info(`users.afterLoginChecks: User must change password for User ID: ${user.id}.`)
       try {
         const pwdChangeToken = await WIKI.models.userKeys.generateToken({
           kind: 'changePwd',
           userId: user.id
         })
+
+        WIKI.logger.info(`users.afterLoginChecks: User password change token generated for User ID: ${user.id}.`)
 
         return {
           mustChangePwd: true,
@@ -467,23 +488,31 @@ module.exports = class User extends Model {
    * Verify a TFA login
    */
   static async loginTFA ({ securityCode, continuationToken, setup }, context) {
+    WIKI.logger.info(`users.loginTFA: Begin Two Factor Authentication Login`)
     if (securityCode.length === 6 && continuationToken.length > 1) {
+      WIKI.logger.info(`users.loginTFA: Validating proper length TFA token`)
       const user = await WIKI.models.userKeys.validateToken({
         kind: setup ? 'tfaSetup' : 'tfa',
         token: continuationToken,
         skipDelete: setup
       })
       if (user) {
+        WIKI.logger.info(`users.loginTFA: Valid user found for login. User ID ${user.id}`)
         if (user.verifyTFA(securityCode)) {
+          WIKI.logger.info(`users.loginTFA: TFA Code Valid for User ID ${user.id}`)
           if (setup) {
+            WIKI.logger.info(`users.loginTFA: Enabling TFA for User ID ${user.id}`)
             await user.enableTFA()
           }
+          WIKI.logger.info(`users.loginTFA: Finish Two FActor Authentication Login.`)
           return WIKI.models.users.afterLoginChecks(user, context, { skipTFA: true })
         } else {
+          WIKI.logger.error(`users.loginTFA: Verify FTA failed for User ID ${user.id}.`)
           throw new WIKI.Error.AuthTFAFailed()
         }
       }
     }
+    WIKI.logger.error(`users.loginTFA: Verify FTA failed for User ID ${user.id}.`)
     throw new WIKI.Error.AuthTFAInvalid()
   }
 

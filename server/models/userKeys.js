@@ -52,6 +52,9 @@ module.exports = class UserKey extends Model {
       validUntil: DateTime.utc().plus({ days: 1 }).toISO(),
       userId
     })
+
+    WIKI.logger.info(`userKeys.generateToken: New token created for User with ID ${userId}.`)
+
     return token
   }
 
@@ -62,10 +65,12 @@ module.exports = class UserKey extends Model {
         await WIKI.models.userKeys.query().deleteById(res.id)
       }
       if (DateTime.utc() > DateTime.fromISO(res.validUntil)) {
+        WIKI.logger.error(`userKeys.WIKI: User auth token expired for User with ID ${res.id}.`)
         throw new WIKI.Error.AuthValidationTokenInvalid()
       }
       return res.user
     } else {
+      WIKI.logger.error(`userKeys.WIKI: User auth token not found. Token: ${token}`)
       throw new WIKI.Error.AuthValidationTokenInvalid()
     }
   }
