@@ -65,17 +65,18 @@ module.exports = class UserKey extends Model {
         await WIKI.models.userKeys.query().deleteById(res.id)
       }
       if (DateTime.utc() > DateTime.fromISO(res.validUntil)) {
-        WIKI.logger.error(`userKeys.WIKI: User auth token expired for User with ID ${res.id}.`)
+        WIKI.logger.error(`userKeys.validateToken: User auth token expired for User with ID ${res.id}.`)
         throw new WIKI.Error.AuthValidationTokenInvalid()
       }
       return res.user
     } else {
-      WIKI.logger.error(`userKeys.WIKI: User auth token not found. Token: ${token}`)
+      WIKI.logger.error(`userKeys.validateToken: User auth token not found. Token: ${token}`)
       throw new WIKI.Error.AuthValidationTokenInvalid()
     }
   }
 
   static async destroyToken ({ token }) {
+    WIKI.logger.info(`userKeys.destroyToken: Destroying user auth token. Token: ${token}`)
     return WIKI.models.userKeys.query().findOne({ token }).delete()
   }
 }
