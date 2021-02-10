@@ -362,7 +362,7 @@ module.exports = class User extends Model {
 
     // Is 2FA required?
     if (!skipTFA) {
-      WIKI.logger.info(`users.afterLoginChecks: Two Factor Authentication Required for User ID: ${user.id}.`)
+      WIKI.logger.info(`users.afterLoginChecks: Checking Two Factor Authentication Settings for User ID: ${user.id}.`)
       if (user.tfaIsActive && user.tfaSecret) {
         WIKI.logger.info(`users.afterLoginChecks: Two Factor Authentication set up for User ID: ${user.id}.`)
         try {
