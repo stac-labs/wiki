@@ -504,15 +504,15 @@ module.exports = class User extends Model {
             WIKI.logger.info(`users.loginTFA: Enabling TFA for User ID ${user.id}`)
             await user.enableTFA()
           }
-          WIKI.logger.info(`users.loginTFA: Finish Two FActor Authentication Login.`)
+          WIKI.logger.info(`users.loginTFA: Finish Two Factor Authentication Login.`)
           return WIKI.models.users.afterLoginChecks(user, context, { skipTFA: true })
         } else {
-          WIKI.logger.error(`users.loginTFA: Verify FTA failed for User ID ${user.id}.`)
+          WIKI.logger.error(`users.loginTFA: Verify TFA failed for User ID ${user.id}.`)
           throw new WIKI.Error.AuthTFAFailed()
         }
       }
     }
-    WIKI.logger.error(`users.loginTFA: Verify FTA failed for User ID ${user.id}.`)
+    WIKI.logger.error(`users.loginTFA: Verify TFA failed for User ID ${user.id}.`)
     throw new WIKI.Error.AuthTFAInvalid()
   }
 
