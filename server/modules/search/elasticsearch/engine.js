@@ -111,6 +111,8 @@ module.exports = {
           },
           from: 0,
           size: 50,
+          sort: '_score:desc',
+          track_scores: true,
           _source: ['title', 'description', 'path', 'locale'],
           suggest: {
             suggestions: {
